@@ -753,29 +753,29 @@ app.post('/api/reset-demo', (req: Request, res: Response) => {
 });
 
 // ----------------------------------------------------
-// FRONTEND SERVING (Vite in Dev / Static in Prod)
+// FRONTEND SERVING (Static in Prod / Vite in Dev or fallback)
 // ----------------------------------------------------
 async function startServer() {
-  const isProduction = process.env.NODE_ENV === 'production';
   const distPath = path.join(process.cwd(), 'dist');
+  const distIndexHtml = path.join(distPath, 'index.html');
+  const hasDist = fs.existsSync(distIndexHtml);
 
-  if (!isProduction && fs.existsSync(path.join(process.cwd(), 'src'))) {
+  if (hasDist && process.env.NODE_ENV === 'production') {
+    // Serve production static assets from dist
+    app.use(express.static(distPath));
+    app.get('*', (req: Request, res: Response) => {
+      res.sendFile(distIndexHtml);
+    });
+    console.log('[Server] Serving production static files from dist/');
+  } else {
+    // Serve via Vite dev middleware (instant rendering in AI Studio preview & dev)
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-  } else {
-    app.use(express.static(distPath));
-    app.get('*', (req: Request, res: Response) => {
-      const indexPath = path.join(distPath, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        res.sendFile(indexPath);
-      } else {
-        res.status(500).send("Build introuvable. Veuillez exécuter 'npm run build' avant de lancer l'application en production.");
-      }
-    });
+    console.log('[Server] Serving live application via Vite middleware');
   }
 
   app.listen(Number(PORT), '0.0.0.0', () => {
