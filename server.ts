@@ -11,8 +11,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '10mb' }));
 
-// Database storage file path
-const DATA_DIR = path.join(__dirname, 'data');
+// Database storage file path (Supports Render persistent disk via DATA_DIR environment variable)
+const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 // Types for DB
@@ -757,8 +757,9 @@ app.post('/api/reset-demo', (req: Request, res: Response) => {
 // ----------------------------------------------------
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
+  const distPath = path.join(process.cwd(), 'dist');
 
-  if (!isProduction) {
+  if (!isProduction && fs.existsSync(path.join(process.cwd(), 'src'))) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -766,15 +767,19 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, 'dist');
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+      } else {
+        res.status(500).send("Build introuvable. Veuillez exécuter 'npm run build' avant de lancer l'application en production.");
+      }
     });
   }
 
   app.listen(Number(PORT), '0.0.0.0', () => {
-    console.log(`[Server] Application running at http://0.0.0.0:${PORT}`);
+    console.log(`[Server] Application running at http://0.0.0.0:${PORT} (ENV: ${process.env.NODE_ENV || 'development'})`);
   });
 }
 
