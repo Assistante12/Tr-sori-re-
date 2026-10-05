@@ -760,8 +760,8 @@ async function startServer() {
   const distIndexHtml = path.join(distPath, 'index.html');
   const hasDist = fs.existsSync(distIndexHtml);
 
-  if (hasDist && process.env.NODE_ENV === 'production') {
-    // Serve production static assets from dist
+  if (hasDist) {
+    // Serve production static assets from dist whenever build exists
     app.use(express.static(distPath));
     app.get('*', (req: Request, res: Response) => {
       res.sendFile(distIndexHtml);
@@ -771,11 +771,14 @@ async function startServer() {
     // Serve via Vite dev middleware (instant rendering in AI Studio preview & dev)
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        allowedHosts: true,
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
-    console.log('[Server] Serving live application via Vite middleware');
+    console.log('[Server] Serving live application via Vite middleware (allowedHosts enabled)');
   }
 
   app.listen(Number(PORT), '0.0.0.0', () => {
